@@ -445,11 +445,99 @@ df_cn</code></pre>
 <div id="data-reformation" class="section level3">
 <h3>3. Data reformation</h3>
 <p>Reformat the data so it looks like the below, removing n and filling by cn. Remove rows that have missing data for either student group.</p>
-<pre class="r"><code># df_cn %&gt;% </code></pre>
+<pre class="r"><code>df_group &lt;- df_cn %&gt;%
+  select(-n) %&gt;% 
+  spread(student_group, cn) %&gt;% 
+  janitor::clean_names() %&gt;% 
+  filter(!is.na(hispanic_latino), !is.na(white))
+
+df_group  </code></pre>
+<pre><code>## # A tibble: 33,948 x 7
+## # Groups:   academic_year, school, grade_level [8,217]
+##    academic_year district  school   grade_level level hispanic_latino white
+##    &lt;chr&gt;         &lt;chr&gt;     &lt;chr&gt;    &lt;chr&gt;       &lt;dbl&gt;           &lt;dbl&gt; &lt;dbl&gt;
+##  1 2014-2015     Adrian S~ Adrian ~ Grade 3         1               2     0
+##  2 2014-2015     Adrian S~ Adrian ~ Grade 3         2               3     4
+##  3 2014-2015     Adrian S~ Adrian ~ Grade 3         3               5     7
+##  4 2014-2015     Adrian S~ Adrian ~ Grade 3         4               6    11
+##  5 2014-2015     Adrian S~ Adrian ~ Grade 6         1               2     0
+##  6 2014-2015     Adrian S~ Adrian ~ Grade 6         2               5     3
+##  7 2014-2015     Adrian S~ Adrian ~ Grade 6         3               7     8
+##  8 2014-2015     Adrian S~ Adrian ~ Grade 6         4               7     9
+##  9 2014-2015     Adrian S~ Adrian ~ Grade 7         1               2     3
+## 10 2014-2015     Adrian S~ Adrian ~ Grade 7         2               4     5
+## # ... with 33,938 more rows</code></pre>
 </div>
 </div>
-<div id="part-b" class="section level1">
-<h1>Part B</h1>
+<div id="part-b-achievement-gaps" class="section level2">
+<h2>Part B: Achievement gaps</h2>
+<p>The function below estimates the average difference between two distributions in terms of an effect size. In this case, we are using the cumulative counts to approximate the empirical cumulative distribution function for each group. The distance between the distributions is then estimated and transformed to an effect size-like measure (for more information, see Ho &amp; Reardon, 2012). The nice thing about this approach, is that we’re able to obtain an effect size on the average difference in achievement between to groups of students as if we had the full, student level data even though we just have the counts within each category.</p>
+<p>In the below function, the first argument supplied is the data source, followed by two string variables, the names of the reference and focal distributions, respectively (e.g., <code>&quot;white&quot;</code> and <code>&quot;hispanic_latino&quot;</code> in this case).</p>
+<p>Note - you’ll need to install the <code>{pracma}</code> package first (assuming you don’t have it installed already, of course).</p>
+<pre class="r"><code># install.packages(&quot;pracma&quot;)
+gap &lt;- function(data, ref, foc) {
+    x &lt;- data[[ref]]
+    y &lt;- data[[foc]]
+    auc &lt;- pracma::trapz(y / y[length(x)],
+                         x / x[length(x)])
+    sqrt(2)*qnorm(auc)
+}
+
+### Example
+# gap(d[1:4, ], &quot;white&quot;, &quot;hispanic_latino&quot;)</code></pre>
+<div id="achievement-gap-estimation" class="section level3">
+<h3>1. Achievement gap estimation</h3>
+<p>Estimate an achievement gap effect size for every school in the state that reported data on both student groups (i.e., using the data we created above), for each grade level in each academic year.</p>
+<pre class="r"><code>df_es &lt;- df_group %&gt;% 
+  group_by(academic_year, grade_level, school) %&gt;% 
+  nest() %&gt;% 
+  mutate(es = map_dbl(data, ~ gap(.x, &quot;white&quot;, &quot;hispanic_latino&quot;)))
+
+df_es</code></pre>
+<pre><code>## # A tibble: 8,217 x 5
+##    academic_year grade_level   school                data                es
+##    &lt;chr&gt;         &lt;chr&gt;         &lt;chr&gt;                 &lt;list&gt;           &lt;dbl&gt;
+##  1 2014-2015     Grade 3       Adrian Elementary Sc~ &lt;tibble [4 x ~ -0.609 
+##  2 2014-2015     Grade 6       Adrian Elementary Sc~ &lt;tibble [4 x ~ -0.972 
+##  3 2014-2015     Grade 7       Adrian Elementary Sc~ &lt;tibble [4 x ~ -0.609 
+##  4 2014-2015     Grade 3       Amity Elementary Sch~ &lt;tibble [4 x ~ -0.419 
+##  5 2014-2015     Grade 4       Amity Elementary Sch~ &lt;tibble [4 x ~ -0.849 
+##  6 2014-2015     Grade 5       Amity Elementary Sch~ &lt;tibble [4 x ~ -0.822 
+##  7 2014-2015     Grade 6       Amity Middle School   &lt;tibble [4 x ~ -0.106 
+##  8 2014-2015     Grade 7       Amity Middle School   &lt;tibble [4 x ~ -0.556 
+##  9 2014-2015     Grade 8       Amity Middle School   &lt;tibble [4 x ~ -0.0322
+## 10 2014-2015     Grade HS (11) Ashland High School   &lt;tibble [4 x ~ -0.804 
+## # ... with 8,207 more rows</code></pre>
+<pre class="r"><code>df_es_district &lt;- df_group %&gt;% 
+  group_by(academic_year, grade_level, school, district) %&gt;% 
+  nest() %&gt;% 
+  mutate(es = map_dbl(data, ~ gap(.x, &quot;white&quot;, &quot;hispanic_latino&quot;)))
+
+df_es_district</code></pre>
+<pre><code>## # A tibble: 8,487 x 6
+##    academic_year grade_level  school          district   data            es
+##    &lt;chr&gt;         &lt;chr&gt;        &lt;chr&gt;           &lt;chr&gt;      &lt;list&gt;       &lt;dbl&gt;
+##  1 2014-2015     Grade 3      Adrian Element~ Adrian SD~ &lt;tibble [~ -0.609 
+##  2 2014-2015     Grade 6      Adrian Element~ Adrian SD~ &lt;tibble [~ -0.972 
+##  3 2014-2015     Grade 7      Adrian Element~ Adrian SD~ &lt;tibble [~ -0.609 
+##  4 2014-2015     Grade 3      Amity Elementa~ Amity SD ~ &lt;tibble [~ -0.419 
+##  5 2014-2015     Grade 4      Amity Elementa~ Amity SD ~ &lt;tibble [~ -0.849 
+##  6 2014-2015     Grade 5      Amity Elementa~ Amity SD ~ &lt;tibble [~ -0.822 
+##  7 2014-2015     Grade 6      Amity Middle S~ Amity SD ~ &lt;tibble [~ -0.106 
+##  8 2014-2015     Grade 7      Amity Middle S~ Amity SD ~ &lt;tibble [~ -0.556 
+##  9 2014-2015     Grade 8      Amity Middle S~ Amity SD ~ &lt;tibble [~ -0.0322
+## 10 2014-2015     Grade HS (1~ Ashland High S~ Ashland S~ &lt;tibble [~ -0.804 
+## # ... with 8,477 more rows</code></pre>
+</div>
+<div id="plot" class="section level3">
+<h3>2. Plot</h3>
+<p>The plot below shows the achievement gap estimates for one school by grade in Ashland School District during the 2017-18 school year. Produce a similar plot to the below (noting the school, academic year, and school district) for each of the first 100 unique school/year/district combinations. Hint - you’ll want to use your effect size data from from the previous question, nest it, then apply slice(1:100). Note that the only reason I’m asking you to slice the data frame is just to reduce run time. In reality, you would do this for all school/year/district combinations.</p>
+<pre class="r"><code>a &lt;- df_es_district %&gt;% 
+  select(-data) %&gt;% 
+  group_by(academic_year, school, district) %&gt;% 
+  nest() %&gt;% 
+  slice(1:100)</code></pre>
+</div>
 </div>
 
 
