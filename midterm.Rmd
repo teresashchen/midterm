@@ -1,0 +1,85 @@
+---
+title: "EDUC | 19S | Midterm"
+author: "Teresa Chen"
+date: "4/26/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+
+knitr::opts_chunk$set(echo = TRUE,
+                      wwarning = TRUE,
+                      cache = TRUE)
+```
+
+
+## Part A: Data
+
+```{r}
+download_file <- function(year) {
+    link <- glue::glue("https://www.oregon.gov/ode/educator-resources/assessment/TestResults20{year}/pagr_schools_ela_raceethnicity_{year-1}{year}.xlsx")
+    rio::import(link, setclass = "tibble", na = c("-", "--", "*"))
+}
+```
+
+### 1. Data preparation
+
+Use the function above to download all the data for each of the past 4 school years and bind it into a single data frame, using a single function (i.e., one line of code). Note, this may take a minute or two to run, depending on your Internet speed.
+
+```{r}
+
+original <- map_df(c(15:18), download_file) 
+
+
+```
+
+
+Conduct some basic data cleaning to make your data file look like the following.
+
++ Filter for only student groups coded as "White" or "Hispanic/Latino".  
++ Select variables related to the number of students in each of the levels (1:4), and not percentages or collapsed levels.  
++ Remove any row that has missing data in any of the n variables
+
+```{r}
+df <- janitor::clean_names(original) %>% 
+  filter(student_group == "White" | student_group == "Hispanic/Latino") %>% 
+  dplyr::select(academic_year, district, school, student_group, grade_level, 
+         number_level_4, number_level_3, number_level_2, number_level_1) %>% 
+  gather(level, n, number_level_4:number_level_1) %>% 
+  filter(!is.na(n)) %>% 
+  mutate(level = parse_number(level)) %>% 
+  arrange(academic_year, district, student_group, grade_level, level)
+
+df
+```
+
+### 2. Cumulative calculation
+
+Calculate the cumulative n for each school by student group, grade, and academic year. The result should look like the below. Hint, look at `?base::cumsum`.
+
+```{r}
+df_cn <- df %>% group_by(academic_year, school, student_group, grade_level) %>% 
+  mutate(cn = cumsum(n))
+
+df_cn
+```
+
+### 3. Data reformation
+
+Reformat the data so it looks like the below, removing n and filling by cn. Remove rows that have missing data for either student group.
+
+```{r}
+# df_cn %>% 
+  
+```
+
+
+# Part B
+
+
+
+
+
+
