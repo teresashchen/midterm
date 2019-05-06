@@ -109,13 +109,12 @@ gap <- function(data, ref, foc) {
 Estimate an achievement gap effect size for every school in the state that reported data on both student groups (i.e., using the data we created above), for each grade level in each academic year.
 
 ```{r}
-df_es <- df_group %>% 
-  group_by(academic_year, grade_level, school) %>% 
-  nest() %>% 
-  mutate(es = map_dbl(data, ~ gap(.x, "white", "hispanic_latino")))
-
-df_es
-
+# df_es <- df_group %>% 
+#   group_by(academic_year, grade_level, school) %>% 
+#   nest() %>% 
+#   mutate(es = map_dbl(data, ~ gap(.x, "white", "hispanic_latino")))
+# 
+# df_es
 
 df_es_district <- df_group %>% 
   group_by(academic_year, grade_level, school, district) %>% 
@@ -123,19 +122,118 @@ df_es_district <- df_group %>%
   mutate(es = map_dbl(data, ~ gap(.x, "white", "hispanic_latino")))
 
 df_es_district
+
 ```
 
 ### 2. Plot
 
 The plot below shows the achievement gap estimates for one school by grade in Ashland School District during the 2017-18 school year. Produce a similar plot to the below (noting the school, academic year, and school district) for each of the first 100 unique school/year/district combinations. Hint - you’ll want to use your effect size data from from the previous question, nest it, then apply slice(1:100). Note that the only reason I’m asking you to slice the data frame is just to reduce run time. In reality, you would do this for all school/year/district combinations.
 
-```{r}
-a <- df_es_district %>% 
+
+#### Test 1: reproduce the plot
+
+
+```{r fig.height=8,fig.width=10}
+
+temp <- df_es_district %>%
   select(-data) %>% 
-  group_by(academic_year, school, district) %>% 
-  nest() %>% 
-  slice(1:100)
+  # group_by(academic_year, school, district) %>% 
+  # # nest() %>%
+  # # mutate(title = glue::glue("Achievement Gap Estimates:{school}"),
+  # #        caption = glue::glue("{academic_year} School year, {district}, Oregon")) %>%
+  # # unnest() %>%
+  filter(academic_year == "2017-2018",
+         school == "Ashland Middle School")
+
+temp %>%
+  mutate(grade_level = parse_number(grade_level)) %>% 
+  ggplot(aes(x = grade_level, y = es, fill = es)) +
+  geom_col() +
+  scale_fill_distiller(type = "seq", 
+                       limits = c(-1.5, 1.5),
+                       palette = "BrBG", 
+                       direction = -1)+
+  geom_hline(yintercept = 0, size = 3, color = "#e0e9d5") +
+  coord_flip() +
+  theme_minimal(base_size = 15) +
+  theme(legend.position = "bottom",
+        legend.justification = "right",
+        legend.key.width = unit(6, "line")) +
+  labs(x = "Grade",
+       y = "Effect Size",
+       fill = "",
+       title = "Achievement Gap Estimates: Ashland Middle School",
+       subtitle = "Students codes as White as compared to those coded as Hispanic/Latino",
+       caption = "2017-2018 School year, Ashland School District, Oregon")
+
+## not sure why "glue::glue("Achievement Gap Estimates: {school}")" and 
+## "glue::glue("{academic_year} School year, {district}, Oregon")" don't work here
+
+
 ```
 
 
+
+#### Slice the dataset and produce multiple plots
+
+```{r fig.height=8,fig.width=10}
+
+df_plot <- df_es_district %>% 
+  select(-data) %>% 
+  group_by(academic_year, school, district) %>% 
+  nest() %>% 
+  slice(1:100) %>% 
+  # mutate(title = glue::glue("Achievement Gap Estimates:{school}"),
+  #        caption = glue::glue("{academic_year} School year, {district}, Oregon")) %>% 
+  unnest()
+
+
+final_plots <- df_plot %>% 
+  group_by(academic_year, school, district) %>% 
+  nest() %>% 
+  mutate(plots = pmap(list(academic_year, school, district, data),
+                      ~ggplot(..4, aes(x = grade_level, y = es, fill = es)) +
+                        geom_col(aes(fill = es)) +
+                        scale_fill_distiller(type = "seq", 
+                                             limits = c(min(df_plot$es), max(df_plot$es)),
+                                             palette = "BrBG", 
+                                             direction = -1) +
+                        ylim(min(df_plot$es), max(df_plot$es)) +
+                        geom_hline(yintercept = 0, size = 3, color = "#e0e9d5") +
+                        coord_flip() +
+                        theme_minimal(base_size = 15) +
+                        theme(legend.position = "bottom",
+                              legend.justification = "right",
+                              legend.key.width = unit(6, "line")) +
+                        labs(x = "Grade",
+                             y = "Effect Size",
+                             fill = "",
+                             subtitle = "Students codes as White as compared to those coded as Hispanic/Latino",
+                             title = glue::glue("Achievement Gap Estimates: {..2}"),
+                             caption = glue::glue("{..1} School year, {..3}, Oregon"))))
+  
+final_plots$plots[[78]]
+final_plots$plots[[91]]
+```
+
+
+### Save the plots
+
+Save the plots into a “plots” directory. Make sure the file names are meaningful.
+
+```{r}
+fs::dir_create(here::here("plots"))
+
+files_year <- final_plots$academic_year
+files_school <- str_replace_all(tolower(final_plots$school), " ", "-")
+files_district <- str_replace_all(tolower(final_plots$district), " ", "-")
+files <- glue::glue("{files_year}-{files_district}-{files_school}")
+
+paths <- here::here("plots", glue::glue("{files}.png"))
+
+walk2(paths, final_plots$plots, ggsave,
+      width = 9.5,
+      height = 6.5,
+      dpi = 500)
+```
 
