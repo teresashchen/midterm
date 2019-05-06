@@ -130,7 +130,7 @@ df_es_district
 The plot below shows the achievement gap estimates for one school by grade in Ashland School District during the 2017-18 school year. Produce a similar plot to the below (noting the school, academic year, and school district) for each of the first 100 unique school/year/district combinations. Hint - you’ll want to use your effect size data from from the previous question, nest it, then apply slice(1:100). Note that the only reason I’m asking you to slice the data frame is just to reduce run time. In reality, you would do this for all school/year/district combinations.
 
 
-#### Test 1: reproduce the plot
+#### Reproduce the plot
 
 
 ```{r fig.height=8,fig.width=10}
@@ -217,7 +217,7 @@ final_plots$plots[[91]]
 ```
 
 
-### Save the plots
+### 3. Save the plots
 
 Save the plots into a “plots” directory. Make sure the file names are meaningful.
 
